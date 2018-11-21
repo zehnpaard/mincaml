@@ -1,6 +1,6 @@
 open KNormal
 
-let find x env = try M.Find x env with Not_found -> x
+let find x env = try M.find x env with Not_found -> x
 
 let rec g env = function
   | Let((x, t), e1, e2) ->
