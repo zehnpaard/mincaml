@@ -74,3 +74,20 @@ let rec alloc dest cont regenv x t =
       in
       let y = List.find f (List.rev free) in
       Spill(y)
+
+let add x r regenv =
+  if is_reg x then
+    (assert (x = r); regenv)
+  else
+    M.add x r regenv
+
+exception NoReg of Id.t * Type.t
+let find x t regenv =
+  if is_reg x then x
+  else
+    try M.find x regenv
+    with Not_found -> raise (NoReg(x, t))
+let find' x' regenv =
+  match x' with
+    | V(x) -> V(find x Type.Int regenv)
+    | c -> c
