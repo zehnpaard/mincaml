@@ -37,3 +37,40 @@ and target_args src all n = function
   | y :: ys when src = y -> all.(n) :: target_args src all (n+1) ys
   | _ :: ys -> target_args src all (n+1) ys
 
+type alloc_result =
+  | Alloc of Id.t
+  | Spill of Id.t
+let rec alloc dest cont regenv x t =
+  assert (not (M.mem x regenv));
+  let all =
+    match t with
+      | Type.Unit -> ["%g0"]
+      | Type.Float -> allfregs
+      | _ -> allregs
+  in
+  if all = ["%g0"] then 
+    Alloc("%g0")
+  else if is_reg x then 
+    Alloc(x)
+  else
+    let free = fv cont in
+    try
+      let (c, prefer) = target x dest cont in
+      let f lv y =
+        if is_reg y then 
+          S.add y lv
+        else
+          try S.add (M.find y regenv) lv
+          with Not_found -> lv
+      in
+      let live = List.fold_left f S.empty free in
+      let r = List.find (fun r -> not (S.mem r live)) (prefer @ all) in
+      Alloc(r)
+    with Not_found ->
+      let f y = 
+        not (is_reg y) && 
+        (try List.mem (M.find y regenv) all
+         with Not_found -> false)
+      in
+      let y = List.find f (List.rev free) in
+      Spill(y)
