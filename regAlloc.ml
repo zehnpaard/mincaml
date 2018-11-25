@@ -91,3 +91,25 @@ let find' x' regenv =
   match x' with
     | V(x) -> V(find x Type.Int regenv)
     | c -> c
+
+let reg g dest cont regenv = function
+  | Ans(exp) -> g'_and_restore dest cont regenv exp
+  | Let((x, t) as xt, exp, e) ->
+      assert (not (M.mem x regenv));
+      let cont' = concat e dest cont in
+      let (e1', regenv1) = g'_and_restore xt cont' regenv exp in
+      (match alloc_dest cont' regenv1 x t with
+         | Spill(y) ->
+             let r = M.find y regenv1 in
+             let (e2', regenv2) = g dest cont (add x r (M.remove y regenv1)) e in
+             let save =
+               try Save(M.find y regenv, y)
+               with Not_found -> Nop
+             in
+             (seq(save, concat e1' (r, t) e2'), regenv2)
+         | Alloc(r) ->
+             let (e2', regenv2) = g dest cont (add x r regenv1) e in
+             (concat e1' (r, t) e2', regenv2))
+and g'_and_restore dest cont regenv exp =
+  try g' dest cont regenv exp
+  with NoReg(x, t) -> g dest cont regenv (Let((x, t), Restore(x), Ans(exp)))
