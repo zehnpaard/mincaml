@@ -139,3 +139,39 @@ and g' oc = function
       Printf.fprintf oc "\tfcmpd\t%s, %s\n" x y;
       Printf.fprintf oc "\tnop\n";
       g'_non_tail_if oc (NonTail(z)) e1 e2 "fble" "fbg"
+  | Tail, CallCls(x, ys, zs) ->
+      g'_args oc [(x, reg_cl)] ys zs;
+      Printf.fprintf oc "\tld\t[%s + 0], %s\n" reg_cl reg_sw;
+      Printf.fprintf oc "\tjmp\t%s\n" reg_sw;
+      Printf.fprintf oc "\tnop\n"
+  | Tail, CallDir(Id.L(x), ys, zs) ->
+      g'_args oc [] ys zs;
+      Printf.fprintf oc "\tb\t%s\n" x;
+      Printf.fprintf oc "\tnop\n"
+  | NonTail(a), CallCls(x, ys, zs) ->
+      g'_args oc [(x, reg_cl)] ys zs;
+      let ss = stacksize () in
+      Printf.fprintf oc "\tst\t%s, [%s + %d]\n" reg_ra reg_sp (ss - 4);
+      Printf.fprintf oc "\tld\t[%s + 0], %s\n" reg_cl reg_sw;
+      Printf.fprintf oc "\tcall\t%s\n" reg_sw;
+      Printf.fprintf oc "\tadd\t%s, %d, %s\t! delay slot\n" reg_sp ss reg_sp;
+      Printf.fprintf oc "\tsub\t%s, %d, %s\n" reg_sp ss reg_sp;
+      Printf.fprintf oc "\tld\t[%s + %d], %s\n" reg_sp (ss - 4) reg_ra;
+      if List.mem a allregs && a <> regs.(0) then
+        Printf.fprintf oc "\tmov\t%s, %s\n" regs.(0) a
+      else if List.mem a allfregs && a <> fregs.(0) then
+        (Printf.fprintf oc "\tfmovs\t%s, %s\n" fregs.(0) a;
+         Printf.fprintf oc "\tfmovs\t%s, %s\n" (co_freg fregs.(0)) (co_freg a))
+  | NonTail(a), CallDir(Id.L(x), ys, zs) ->
+      g'_args oc [] ys zs;
+      let ss = stacksize () in
+      Printf.fprintf oc "\tst\t%s, [%s + %d]\n" reg_ra reg_sp (ss - 4);
+      Printf.fprintf oc "\tcall\t%s\n" x;
+      Printf.fprintf oc "\tadd\t%s, %d, %s\t! delay slot\n" reg_sp ss reg_sp;
+      Printf.fprintf oc "\tsub\t%s, %d, %s\n" reg_sp ss reg_sp;
+      Printf.fprintf oc "\tld\t[%s + %d], %s\n" reg_sp (ss - 4) reg_ra;
+      if List.mem a allregs && a <> regs.(0) then
+        Printf.fprintf oc "\tmov\t%s, %s\n" regs.(0) a
+      else if List.mem a allfregs && a <> fregs.(0) then
+        (Printf.fprintf oc "\tfmovs\t%s, %s\n" fregs.(0) a;
+         Printf.fprintf oc "\tfmovs\t%s, %s\n" (co_freg fregs.(0)) (co_freg a))
