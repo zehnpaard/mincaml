@@ -175,3 +175,76 @@ and g' oc = function
       else if List.mem a allfregs && a <> fregs.(0) then
         (Printf.fprintf oc "\tfmovs\t%s, %s\n" fregs.(0) a;
          Printf.fprintf oc "\tfmovs\t%s, %s\n" (co_freg fregs.(0)) (co_freg a))
+and g'_tail_if oc e1 e2 b bn =
+  let b_else = Id.genid (b ^ "_else") in
+  Printf.fprintf oc "\t%s\t%s\n" bn b_else;
+  Printf.fprintf oc "\tnop\n";
+  let stackset_back = !stackset in
+  g oc (Tail, e1);
+  Printf.fprintf oc "%s:\n" b_else;
+  stackset := stackset_back;
+  g oc (Tail, e2)
+and g'_non_tail_if oc dest e1 e2 b bn =
+  let b_else = Id.genid (b ^ "_else") in
+  let b_cont = Id.genid (b ^ "_cont") in
+  Printf.fprintf oc "\t%s\t%s\n" bn b_else;
+  Printf.fprintf oc "\tnop\n";
+  let stackset_back = !stackset in
+  g oc (dest, e1);
+  let stackset1 = !stackset in
+  Printf.fprintf oc "\tb\t%s\n" b_cont;
+  Printf.fprintf oc "\tnop\n";
+  Printf.fprintf oc "%s:\n" b_else;
+  stackset := stackset_back;
+  g oc (dest, e2);
+  Printf.fprintf oc "%s:\n" b_cont;
+  let stackset2 = !stackset in
+  stackset := S.inter stackset1 stackset2
+and g'_args oc x_reg_cl ys zs =
+  let (i, yrs) =
+    List.fold_left
+      (fun (i, yrs) y -> (i + 1, (y, regs.(i)) :: yrs))
+      (0, x_reg_cl)
+      ys
+  in
+  List.iter
+    (fun (y, r) -> Printf.fprintf oc "\tmov\t%s, %s\n" y r)
+    (shuffle reg_sw yrs);
+  let (d, zfrs) =
+    List.fold_left
+      (fun (d, zfrs) z -> (d + 1, (z, fregs.(d)) :: zfrs))
+      (0, [])
+      zs
+  in
+  List.iter
+    (fun (z, fr) ->
+      Printf.fprintf oc "\tfmovs\t%s, %s\n" z fr;
+      Printf.fprintf oc "\tfmovs\t%s, %s\n" (co_freg z) (co_freg fr))
+    (shuffle reg_fsw zfrs);
+
+let h oc { name = Id.L(x); args = _; fargs = _; body = e; ret = _ } =
+  Printf.fprintf oc "%s:\n" x;
+  stackset := S.empty;
+  stackmap := [];
+  g oc (Tail, e)
+
+let f oc (Prog(data, fundefs, e)) =
+  Format.eprintf "generationg assembly...@.";
+  Printf.fprintf oc ".section\t\".rodata\"\n";
+  Printf.fprintf oc ".align\t8\n";
+  List.iter
+    (fun (Id.L(x), d) ->
+      Printf.fprintf oc "%s:\t! %f\n" x d;
+      Printf.fprintf oc "\t.long\t0x%lx\n" (gethi d);
+      Printf.fprintf oc "\t.long\t0x%lx\n" (getlo d))
+    data;
+    Printf.fprintf oc ".section\t\".text\"\n";
+    List.iter (fun fundef -> h oc fundef) fundefs;
+    Printf.fprintf oc ".global\tmin_caml_start\n";
+    Printf.fprintf oc "min_caml_start:\n";
+    Printf.fprintf oc "\tsave\t%%sp, -112, %%sp\n";
+    stackset := S.empty;
+    stackmap := [];
+    g oc (NonTail("%g0"), e);
+    Printf.fprintf oc "\tret\n";
+    Printf.fprintf oc "\trestore\n";
