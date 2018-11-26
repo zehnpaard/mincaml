@@ -206,3 +206,28 @@ and g'_call dest cont regenv exp constr ys zs =
           (List.map (fun z -> find z Type.Float regenv) zs))
   in
   (List.fold_left f a (fv cont), M.empty)
+
+let h { name = Id.L(x); args = ys; fargs = zs; body = e; ret = t } =
+  let regenv = M.add x reg_cl M.empty in
+  let f (i, arg_regs, regenv) y =
+    let r = regs.(i) in
+    (i + 1, arg_regs @ [r], (assert (not (is_reg y)); M.add y r regenv))
+  in
+  let (i, arg_regs, regenv) = List.fold_left f (0, [], regenv) ys in
+  let f2 (d, farg_regs, regenv) z =
+    let fr = fregs.(d) in
+    (d + 1, farg_regs @ [fr], (assert (not (is_reg z)); M.add z fr regenv))
+  in
+  let (d, farg_regs, regenv) = List.fold_left f2 (0, [], regenv) zs in
+  let a = match t with
+    | Type.Unit -> Id.gentmp Type.Unit
+    | Type.Float -> fregs.(0)
+    | _ -> regs.(0)
+  in
+  let (e', regenv') = g (a, t) (Ans(Mov(a))) regenv e in
+  { name = Id.L(x); args = arg_regs; fargs = farg_regs; body = e'; ret = t }
+
+let f (Prog(data, fundefs, e)) =
+  let fundefs' = List.map h fundefs in
+  let e', regenv' = g (Id.gentmp Type.Unit, Type.Unit) (Ans(Nop)) M.empty e in
+  Prog(data, fundefs', e')
