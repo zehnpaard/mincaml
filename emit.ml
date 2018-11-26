@@ -88,3 +88,20 @@ and g' oc = function
   | NonTail(x), Restore(y) ->
       assert (List.mem x allfregs);
       Printf.fprintf oc "\tldd\t[%s + %d], %s\n" reg_sp (offset y) x
+  | Tail, (Nop | St _ | StDF _ | Comment _ | Save _ as exp) ->
+      g' oc (NonTail(Id.gentmp Type.Unit), exp);
+      Printf.fprintf oc "\tret1\n";
+      Printf.fprintf oc "\tnop\n"
+  | Tail, (Set _ | SetL _ | Mov _ | Neg _ | Add _ | Sub _ | SLL _ | Ld _ as exp) ->
+      g' oc (NonTail(regs.(0)), exp);
+      Printf.fprintf oc "\tret1\n";
+      Printf.fprintf oc "\tnop\n"
+  | Tail, (FMovD _ | FNegD _ | FAddD _ | FSubD _ | FMulD _ | FDivD _ | LdDF _ as exp) ->
+      g' oc (NonTail(fregs.(0)), exp);
+      Printf.fprintf oc "\tret1\n";
+      Printf.fprintf oc "\tnop\n"
+  | Tail, (Restore(x) as exp) ->
+      (match locate x with
+        | [i] -> g' oc (NonTail(regs.(0)), exp)
+        | [i; j] when i + 1 = j -> g' oc (NonTail(fregs.(0)), exp)
+        | _ -> assert false);
