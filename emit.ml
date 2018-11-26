@@ -76,3 +76,10 @@ and g' oc = function
   | NonTail(x), LdDF(y, z) -> Printf.fprintf oc "\tldd\t[%s + %s], %s\n" y (pp_id_or_imm z) x
   | NonTail(_), StDF(x, y, z) -> Printf.fprintf oc "\tstd\t%s, [%s + %s]\n" x y (pp_id_or_imm z)
   | NonTail(_), Comment(s) -> Printf.fprintf oc "\t! %s\n" s
+  | NonTail(_), Save(x, y) when List.mem x allregs && not (S.mem y !stackset) ->
+      save y;
+      Printf.fprintf oc "\tst\t%s, [%s + %d]\n" x reg_sp (offset y)
+  | NonTail(_), Save(x, y) when List.mem x allfregs && not (S.mem y !stackset) ->
+      save y;
+      Printf.fprintf oc "\tstd\t%s, [%s + %d]\n" x reg_sp (offset y)
+  | NonTail(_), Save(x, y) -> asssert (S.mem y !stackset); ()
