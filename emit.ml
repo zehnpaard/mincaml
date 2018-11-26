@@ -83,3 +83,8 @@ and g' oc = function
       save y;
       Printf.fprintf oc "\tstd\t%s, [%s + %d]\n" x reg_sp (offset y)
   | NonTail(_), Save(x, y) -> asssert (S.mem y !stackset); ()
+  | NonTail(x), Restore(y) when List.mem x allregs ->
+      Printf.fprintf oc "\tstd\t%s, [%s + %d]\n" reg_sp (offset y) x
+  | NonTail(x), Restore(y) ->
+      assert (List.mem x allfregs);
+      Printf.fprintf oc "\tldd\t[%s + %d], %s\n" reg_sp (offset y) x
