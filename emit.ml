@@ -105,3 +105,37 @@ and g' oc = function
         | [i] -> g' oc (NonTail(regs.(0)), exp)
         | [i; j] when i + 1 = j -> g' oc (NonTail(fregs.(0)), exp)
         | _ -> assert false);
+  | Tail, IfEq(x, y, e1, e2) ->
+      Printf.fprintf oc "\tcmp\t%s, %s\n" x (pp_id_or_imm y);
+      g'_tail_if oc e1 e2 "be" "bne"
+  | Tail, IfLE(x, y, e1, e2) ->
+      Printf.fprintf oc "\tcmp\t%s, %s\n" x (pp_id_or_imm y);
+      g'_tail_if oc e1 e2 "ble" "bg"
+  | Tail, IfGE(x, y, e1, e2) ->
+      Printf.fprintf oc "\tcmp\t%s, %s\n" x (pp_id_or_imm y);
+      g'_tail_if oc e1 e2 "bge" "bl"
+  | Tail, IfFEq(x, y, e1, e2) ->
+      Printf.fprintf oc "\tfcmpd\t%s, %s\n" x y;
+      Printf.fprintf oc "\tnop\n";
+      g'_tail_if oc e1 e2 "fbe" "fbne"
+  | Tail, IfFLE(x, y, e1, e2) ->
+      Printf.fprintf oc "\tfcmpd\t%s, %s\n" x y;
+      Printf.fprintf oc "\tnop\n";
+      g'_tail_if oc e1 e2 "fble" "fbg"
+  | NonTail(z), IfEq(x, y, e1, e2) ->
+      Printf.fprintf oc "\tcmp\t%s, %s\n" x (pp_id_or_imm y);
+      g'_non_tail_if oc (NonTail(z)) e1 e2 "be" "bne"
+  | NonTail(z), IfLE(x, y, e1, e2) ->
+      Printf.fprintf oc "\tcmp\t%s, %s\n" x (pp_id_or_imm y);
+      g'_non_tail_if oc (NonTail(z)) e1 e2 "ble" "bg"
+  | NonTail(z), IfGE(x, y, e1, e2) ->
+      Printf.fprintf oc "\tcmp\t%s, %s\n" x (pp_id_or_imm y);
+      g'_non_tail_if oc (NonTail(z)) e1 e2 "bge" "bl"
+  | NonTail(z), IfFEq(x, y, e1, e2) ->
+      Printf.fprintf oc "\tfcmpd\t%s, %s\n" x y;
+      Printf.fprintf oc "\tnop\n";
+      g'_non_non_tail_if oc (NonTail(z)) e1 e2 "fbe" "fbne"
+  | NonTail(z), IfFLE(x, y, e1, e2) ->
+      Printf.fprintf oc "\tfcmpd\t%s, %s\n" x y;
+      Printf.fprintf oc "\tnop\n";
+      g'_non_tail_if oc (NonTail(z)) e1 e2 "fble" "fbg"
