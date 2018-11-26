@@ -113,3 +113,121 @@ let reg g dest cont regenv = function
 and g'_and_restore dest cont regenv exp =
   try g' dest cont regenv exp
   with NoReg(x, t) -> g dest cont regenv (Let((x, t), Restore(x), Ans(exp)))
+and g' dest cont regenv = function
+  | Nop
+  | Set _
+  | SetL _
+  | Comment _
+  | Restore _ as exp -> (Ans(exp), regenv)
+  | Mov(x) -> (Ans(Mov(find x Type.Int regenv)), regenv)
+  | Neg(x) -> (Ans(Neg(find x Type.Int regenv)), regenv)
+  | Add(x, y) -> (Ans(Add(find x Type.Int regenv, find' y regenv)), regenv)
+  | Sub(x, y) -> (Ans(Sub(find x Type.Int regenv, find' y regenv)), regenv)
+  | SLL(x, y) -> (Ans(SLL(find x Type.Int regenv, find' y regenv)), regenv)
+  | Ld(x, y) -> (Ans(Ld(find x Type.Int regenv, find' y regenv)), regenv)
+  | St(x, y, z) ->
+      let x' = find x Type.Int regenv in
+      let y' = find y Type.Int regenv in
+      let z' = find' z regenv in
+      (Ans(St(x', y', z')), regenv)
+  | FMovD(x) -> (Ans(FMovD(find x Type.Float regenv)), regenv)
+  | FNegD(x) -> (Ans(FNegD(find x Type.Float regenv)), regenv)
+  | FAddD(x, y) ->
+      let x' = find x Type.Float regenv in
+      let y' = find y Type.Float regenv in
+      (Ans(FAddD(x', y')), regenv)
+  | FSubD(x, y) ->
+      let x' = find x Type.Float regenv in
+      let y' = find y Type.Float regenv in
+      (Ans(FSubD(x', y')), regenv)
+  | FMulD(x, y) ->
+      let x' = find x Type.Float regenv in
+      let y' = find y Type.Float regenv in
+      (Ans(FMulD(x', y')), regenv)
+  | FDivD(x, y) ->
+      let x' = find x Type.Float regenv in
+      let y' = find y Type.Float regenv in
+      (Ans(FDivD(x', y')), regenv)
+  | LdDF(x, y) -> (Ans(LdDF(find x Type.Int regenv, find' y regenv)), regenv) (* really? *)
+  | StDF(x, y, z) ->
+      let x' = find x Type.Float regenv in
+      let y' = find y Type.Float regenv in
+      let z' = find' z regenv in
+      (Ans(StDF(x', y', z')), regenv)
+  | IfEq(x, y, e1, e2) as exp ->
+      let f e1' e2' = IfEq(find x Type.Int regenv, find' y regenv, e1', e2') in
+      g'_if dest cont regenv exp f e1 e2
+  | IfLE(x, y, e1, e2) as exp ->
+      let f e1' e2' = IfLE(find x Type.Int regenv, find' y regenv, e1', e2') in
+      g'_if dest cont regenv exp f e1 e2
+  | IfGE(x, y, e1, e2) as exp ->
+      let f e1' e2' = IfGE(find x Type.Int regenv, find' y regenv, e1', e2') in
+      g'_if dest cont regenv exp f e1 e2
+  | IfFEq(x, y, e1, e2) as exp ->
+      let f e1' e2' = IfFEq(find x Type.Float regenv, find y Type.Float regenv, e1', e2') in
+      g'_if dest cont regenv exp f e1 e2
+  | IfFLE(x, y, e1, e2) as exp ->
+      let f e1' e2' = IfFLE(find x Type.Float regenv, find y Type.Float regenv, e1', e2') in
+      g'_if dest cont regenv exp f e1 e2
+  | CallCls(x, ys, zs) as exp ->
+      let f ys zs = CallCls(find x Type.Int regenv, ys, zs) in
+      g'_call dest cont regenv exp f ys zs
+  | CallCls(l, ys, zs) as exp ->
+      let f ys zs = CallDir(l, ys, zs) in
+      g'_call dest cont regenv exp f ys zs
+  | Save(x, y) -> assert false
+and g'_if dest cont regenv exp constr e1 e2 =
+  let (e1', regenv1) = g dest cont regenv e1 in
+  let (e2', regenv2) = g dest cont regenv e2 in
+  let f1 regenv x =
+    try
+      if is_reg x then regenv
+      else
+        let r1 = M.find x regenv1 in
+        let r2 = M.find x regenv2 in
+        if r1 <> r2 then regenv
+        else M.add x r1 regenv
+    with Not_found -> regenv
+  in
+  let regenv' = List.fold_left f1 M.empty (fv cont) in
+  let f2 e 2 =
+    if x = fst dest || not (M.mem x regenv) then e
+    else seq(Save(M.find x regenv, x), e)
+  in
+  (List.fold_left f2 Ans(constr e1' e2') (fv cont), regenv')
+and g'_call dest cont regenv exp constr ys zs =
+  let f e x =
+    if x = fst dest || not (M.mem x regenv) then e
+    else seq(Save(M.find x regenv, x), e)
+  in
+  let a =
+    Ans(constr
+          (List.map (fun y -> find y Type.Int regenv) ys)
+          (List.map (fun z -> find z Type.Float regenv) zs))
+  in
+  (List.fold_left f a (fv cont), M.empty)
+
+let h { name = Id.L(x); args = ys; fargs = zs; body = e; ret = t } =
+  let regenv = M.add x reg_cl M.empty in
+  let f (i, arg_regs, regenv) y =
+    let r = regs.(i) in
+    (i + 1, arg_regs @ [r], (assert (not (is_reg y)); M.add y r regenv))
+  in
+  let (i, arg_regs, regenv) = List.fold_left f (0, [], regenv) ys in
+  let f2 (d, farg_regs, regenv) z =
+    let fr = fregs.(d) in
+    (d + 1, farg_regs @ [fr], (assert (not (is_reg z)); M.add z fr regenv))
+  in
+  let (d, farg_regs, regenv) = List.fold_left f2 (0, [], regenv) zs in
+  let a = match t with
+    | Type.Unit -> Id.gentmp Type.Unit
+    | Type.Float -> fregs.(0)
+    | _ -> regs.(0)
+  in
+  let (e', regenv') = g (a, t) (Ans(Mov(a))) regenv e in
+  { name = Id.L(x); args = arg_regs; fargs = farg_regs; body = e'; ret = t }
+
+let f (Prog(data, fundefs, e)) =
+  let fundefs' = List.map h fundefs in
+  let e', regenv' = g (Id.gentmp Type.Unit, Type.Unit) (Ans(Nop)) M.empty e in
+  Prog(data, fundefs', e')
