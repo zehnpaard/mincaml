@@ -4,6 +4,7 @@ type t =
   | Ans of exp
   | Let of (Id.t * Type.t) * exp * t
 and exp =
+  | Nop
   | Set of int
   | Mov of Id.t
   | Sub of Id.t * id_or_imm
