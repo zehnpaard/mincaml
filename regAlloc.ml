@@ -1,7 +1,7 @@
 open Asm
 
 let rec target' src (dest, t) = function
-  | Mov(x) when x = src '' is_reg dest ->
+  | Mov(x) when x = src && is_reg dest ->
       assert (t <> Type.Unit);
       assert (t <> Type.Float);
       false, [dest]
