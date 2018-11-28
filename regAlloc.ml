@@ -98,7 +98,7 @@ let reg g dest cont regenv = function
       assert (not (M.mem x regenv));
       let cont' = concat e dest cont in
       let (e1', regenv1) = g'_and_restore xt cont' regenv exp in
-      (match alloc_dest cont' regenv1 x t with
+      (match alloc dest cont' regenv1 x t with
          | Spill(y) ->
              let r = M.find y regenv1 in
              let (e2', regenv2) = g dest cont (add x r (M.remove y regenv1)) e in
