@@ -92,7 +92,7 @@ let find' x' regenv =
     | V(x) -> V(find x Type.Int regenv)
     | c -> c
 
-let reg g dest cont regenv = function
+let rec g dest cont regenv = function
   | Ans(exp) -> g'_and_restore dest cont regenv exp
   | Let((x, t) as xt, exp, e) ->
       assert (not (M.mem x regenv));
