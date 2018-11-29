@@ -42,4 +42,3 @@ let () =
     List.iter
       (fun f -> ignore (file f))
       !files
-
