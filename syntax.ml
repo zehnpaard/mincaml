@@ -2,7 +2,7 @@ type t =
   | Unit
   | Bool of bool
   | Int of int
-  | Flaot of float
+  | Float of float
   | Not of t
   | Neg of t
   | Add of t * t
