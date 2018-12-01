@@ -89,7 +89,7 @@ exp:
     { Not(Eq($1, $3)) }
   | exp LESS exp
     { Not(LE($3, $1)) }
-  | exp GRETER exp
+  | exp GREATER exp
     { Not(LE($1, $3)) }
   | exp LESS_EQUAL exp
     { LE($1, $3) }
