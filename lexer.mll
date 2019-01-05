@@ -49,7 +49,7 @@ rule token = parse
                     (Lexing.lexeme lexbuf)
                     (Lexing.lexeme_start lexbuf)
   (Lexing.lexeme_end lexbuf)) }
-and comment = parsr
+and comment = parse
   | "*)" { () }
   | "(*" { comment lexbuf; comment lexbuf }
   | eof { Format.eprintf "warning: unterminated comment@." }
